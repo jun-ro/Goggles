@@ -1,7 +1,7 @@
 
 ![Logo](https://raw.githubusercontent.com/jun-ro/Goggles/main/readme/GogglesBannerGit.png)
 
-
+*"Just a botchy StudentVUE scraper..."* -Jun-ro.
 ## Installation
 
 You can install [Goggles](https://github.com/jun-ro/Goggles.git) using this:
