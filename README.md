@@ -4,11 +4,11 @@
 *"Just a botchy StudentVUE scraper..."* -Jun-ro.
 ## Installation
 
-You can install [Goggles](https://github.com/jun-ro/Goggles.git) using this:
+You can install [Goggles](https://github.com/jun-ro/Goggles.git) with these steps:
+- Install Puppeteer `npm install puppeteer`
+- Download "Goggles.js" from this repo and place it in your editor.
 
-```bash
-  npm install goggles.js
-```
+
     
 ## API 
 
