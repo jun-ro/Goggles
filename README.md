@@ -12,7 +12,7 @@ You can install [Goggles](https://github.com/jun-ro/Goggles.git) using this:
     
 ## API 
 
-#### Get all items
+#### Scrape the "Gradebook"
 
 ```js
   getGradebook(username, password)
@@ -24,7 +24,7 @@ You can install [Goggles](https://github.com/jun-ro/Goggles.git) using this:
 | `password` | `string` | **Required**. Your StudentVUE Password. |
 
 
-#### Get item
+#### Scrape assignment details.
 
 ```js
   getAssignmentDetails(username, password, guid);
