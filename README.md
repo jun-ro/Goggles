@@ -5,7 +5,7 @@
 
 ## Todo
 
-- Optimize the code to be a whole lot messy ❌
+- Optimize the code to be a whole less messy ❌
 - Account for other school districts within the StudentVUE system ❌
 
 ## Installation
