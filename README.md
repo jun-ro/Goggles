@@ -36,10 +36,6 @@ You can install [Goggles](https://github.com/jun-ro/Goggles.git) with these step
 | `password`      | `string` | **Required**. Your StudentVue Password |
 | `guid`      | `string` | **Required**. Your class "GUID", you can find it in getGradebook() |
 
-#### add(num1, num2)
-
-Takes two numbers and returns the sum.
-
 
 ## Usage/Examples
 
