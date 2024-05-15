@@ -2,6 +2,12 @@
 ![Logo](https://raw.githubusercontent.com/jun-ro/Goggles/main/readme/GogglesBannerGit.png)
 
 *"Just a botchy StudentVUE scraper..."* -Jun-ro.
+
+## Todo
+
+- Optimize the code to be a whole lot messy ❌
+- Account for other school districts within the StudentVUE system ❌
+
 ## Installation
 
 You can install [Goggles](https://github.com/jun-ro/Goggles.git) with these steps:
@@ -10,7 +16,7 @@ You can install [Goggles](https://github.com/jun-ro/Goggles.git) with these step
 
 
     
-## API 
+## API
 
 #### Scrape the "Gradebook"
 
