@@ -2,40 +2,36 @@ const puppeteer = require("puppeteer");
 
 class StudentVueAPI {
   constructor() {
-    this.occupied = false;
-    this.browser;
-    this.page;
+    this.instances = [];
+    this.enums = {
+      errorMessage: "Selector not found within the timeout period, probably invalid credentials",
+      synergyMailClass: `.lp-tile[data-bind="click: launch"]`,
+      defaultSynergyButtonsClass: `lp-tile flexbox vertical auto middle`,
+      GradeBook: "Grade Book",
+      GradeBookElements: {
+        classNameElements: "row gb-class-header gb-class-row flexbox horizontal",
+        gradeMarkElements: "row gb-class-row",
+      }
+    }
   }
 
-  reset(){
-    this.occupied = false;
-    this.browser = null;
-    this.page = null;
-  }
+
+  // Helper Functions
 
   async launchStudentVue(user, password) {
-    if (this.occupied === true) {
-      console.error(
-        "Puppeteer is currently doing a task! Can not do simultaneous tasks!"
-      );
-      return;
-    }
-
-    this.occupied = true;
-
-    var grades;
-
-    // Instanciate a new browser to start scraping data
-
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({headless: false});
     const page = await browser.newPage();
+    await page.setRequestInterception(true);
 
-    // Navigate to the login page for MCPS StudentVue.
+    page.on("request", (req) => {
+      if (req.resourceType() == "font" || req.resourceType() == "image") {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
 
     await page.goto("https://md-mcps-psv.edupoint.com/PXP2_Login_Student.aspx");
-
-    // Start Logging in
-
     await page.focus('input[name="ctl00\\$MainContent\\$username"]');
     await page.type('input[name="ctl00\\$MainContent\\$username"]', user);
     await page.focus('input[name="ctl00\\$MainContent\\$password"]');
@@ -44,65 +40,63 @@ class StudentVueAPI {
       'input[type="submit"][name="ctl00\\$MainContent\\$Submit1"]'
     );
 
-    this.browser = browser;
-    this.page = page;
+    return { browser, page };
   }
 
-  async getGradeBook(user, password) {
-    var grades;
-    await this.launchStudentVue(user, password);
+  async closeInstance(instance) {
+    await instance.page.close();
+    await instance.browser.close();
+  }
 
+  async checkLogin(instance, timeoutTime) {
     try {
-      await this.page.waitForSelector('.lp-tile[data-bind="click: launch"]', {
-        timeout: 3000,
-      }); // Adjust timeout as needed
+      await instance.page.waitForSelector(this.enums.synergyMailClass, {timeout: timeoutTime}); // Adjust timeout as needed
     } catch (error) {
-      console.error(
-        "Selector not found within the timeout period, probably invalid credentials"
-      );
-      await this.browser.close();
-      this.occupied = false;
-      return {
-        error:
-          "Selector not found within the timeout period, probably invalid credentials",
-      };
+      console.error(this.enums.errorMessage);
+      this.closeInstance(instance);
+      return {error: this.enums.errorMessage,};
     }
+  }
 
-    const buttons = await this.page.evaluate(() => {
-      let returnStatement = null; // Initialize returnStatement to null
-
-      const elements = document.getElementsByClassName(
-        "lp-tile flexbox vertical auto middle"
-      );
+  async goToPage(instance, nameOfPage) {
+    await instance.page.evaluate((nameOfPage, enums) => {
+      const elements = document.getElementsByClassName(enums.defaultSynergyButtonsClass);
 
       for (let i = 0; i < elements.length; i++) {
         const specificElement = elements[i];
         const titleElement = specificElement.querySelector(".title");
-        if (titleElement.textContent.trim() == "Grade Book") {
+        if (titleElement.textContent.trim() == nameOfPage) {
           specificElement.click();
           break;
         }
       }
-    });
+    }, nameOfPage, this.enums);
+
+    await instance.page.waitForNavigation();
+  }
+
+  // Main Functions (for the API)
+
+  async getGradeBook(user, password) {
+    const { browser, page } = await this.launchStudentVue(user, password);
+
+    await this.checkLogin({ browser, page }, 3000);
+    await this.goToPage({ browser, page }, this.enums.GradeBook);
 
     // We are now in Gradebook, time to start scraping data!
 
-    await this.page.waitForNavigation();
-
-    const ClassData = await this.page.evaluate(() => {
+    const ClassData = await page.evaluate((enums) => {
       var dataGuids = [];
       var ClassNames = [];
       var Marks = [];
       var returnStatement = {};
 
-      const nameElements = document.getElementsByClassName(
-        "row gb-class-header gb-class-row flexbox horizontal"
-      );
-      const gradeElements = document.getElementsByClassName("row gb-class-row");
+      const nameElements = document.getElementsByClassName(enums.GradeBookElements.classNameElements);
+      const gradeElements = document.getElementsByClassName(enums.GradeBookElements.gradeMarkElements);
 
       for (let i = 0; i < nameElements.length; i++) {
         const specificElement = nameElements[i];
-        const rowElement = specificElement.querySelector(`div[scope="row"]`);
+        const rowElement = specificElement.firstElementChild;
         const titleElement = rowElement.firstElementChild;
         dataGuids.push(specificElement.getAttribute("data-guid").toString());
         ClassNames.push(titleElement.textContent.trim());
@@ -111,7 +105,7 @@ class StudentVueAPI {
       for (let i = 0; i < gradeElements.length; i++) {
         const specificGradeElements = gradeElements[i];
         const specificGradeId = specificGradeElements.getAttribute("data-guid");
-        const dataElements = specificGradeElements.children[0];
+        const dataElements = specificGradeElements.firstElementChild
         const gradeDetails = dataElements.children[1];
         if (gradeDetails && gradeDetails.children[1]) {
           const mark = gradeDetails.children[1].textContent.trim();
@@ -124,65 +118,29 @@ class StudentVueAPI {
       }
 
       return returnStatement;
-    });
+    }, this.enums);
 
-    this.browser.close();
-    this.reset();
+    this.closeInstance({ browser, page });
     return await ClassData;
   }
 
   async getAssignmentDetails(user, password, guid) {
-    await this.launchStudentVue(user, password);
-    await this.page.setViewport({ width: 1920, height: 1080 });
+    const { browser, page } = await this.launchStudentVue(user, password);
 
-    try {
-      await this.page.waitForSelector('.lp-tile[data-bind="click: launch"]', {
-        timeout: 3000,
-      }); // Adjust timeout as needed
-    } catch (error) {
-      console.error(
-        "Selector not found within the timeout period, probably invalid credentials"
-      );
-      await this.browser.close();
-      this.occupied = false;
-      return {
-        error:
-          "Selector not found within the timeout period, probably invalid credentials",
-      };
-    }
+    await this.checkLogin({ browser, page }, 3000);
+    await this.goToPage({ browser, page }, "Grade Book");
 
-    const buttons = await this.page.evaluate(() => {
-      let returnStatement = null; // Initialize returnStatement to null
-
-      const elements = document.getElementsByClassName(
-        "lp-tile flexbox vertical auto middle"
-      );
-
-      for (let i = 0; i < elements.length; i++) {
-        const specificElement = elements[i];
-        const titleElement = specificElement.querySelector(".title");
-        if (titleElement.textContent.trim() == "Grade Book") {
-          specificElement.click();
-          break;
-        }
-      }
-    });
-
-    await this.page.waitForNavigation();
-
-    const clickOnClass = await this.page.evaluate((guid) => {
-      const classes = document.getElementsByClassName(
-        "row gb-class-header gb-class-row flexbox horizontal"
-      );
+    await page.evaluate((guid, enums) => {
+      const classes = document.getElementsByClassName(enums.GradeBookElements.classNameElements);
       for (var i = 0; i < classes.length; i++) {
         if (classes[i].getAttribute("data-guid") === guid) {
           classes[i].firstElementChild.firstElementChild.click();
           break;
         }
       }
-    }, guid);
+    }, guid, this.enums);
 
-    const getAssignmentView = await this.page.evaluate(async () => {
+    const getAssignmentView = await page.evaluate(async () => {
       const response = await fetch(
         "https://md-mcps-psv.edupoint.com/api/GB/ClientSideData/Transfer?action=pxp.course.content.items-LoadWithOptions",
         {
@@ -191,9 +149,6 @@ class StudentVueAPI {
             "accept-language": "en-US,en;q=0.9",
             "content-type": "application/json; charset=UTF-8",
             current_web_portal: "StudentVUE",
-            "sec-ch-ua": '"Chromium";v="109", "Not_A Brand";v="99"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
@@ -212,7 +167,6 @@ class StudentVueAPI {
       // Time to format the data
 
       const { responseData } = await response.json();
-
       const formattedData = {};
 
       for (const { items } of responseData.data) {
@@ -225,12 +179,11 @@ class StudentVueAPI {
         }
       }
 
-      return formattedData
+      return formattedData;
     });
 
-    await this.browser.close();
-    this.reset();
-    return await getAssignmentView
+    await this.closeInstance({ browser, page });
+    return await getAssignmentView;
   }
 }
 
